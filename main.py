@@ -1,120 +1,34 @@
 import io
-import sys
-import binascii
-from PIL import Image
 import jpgparser
+from argparse import ArgumentParser
 
-jp = jpgparser.JpegStructure.fromFile("RESTAURACE POHADKA - YoureGone.jpg" )
-
-if (len(sys.argv) < 3):
-    print('Pouziti:')
-    print('    skript.py <Operace> <nazev souboru>')
-    print('    Operace: "crop" nebo "getmeta"')
-    print('        crop orizne obrazek, prida tajnou zpravu a ulozi do out.jpg')
-    print('        getmeta zobrazi skrytou zpravu')
-    exit()
+parser = ArgumentParser(description='Stereoskopicke obrazky: skript umi nacist JPEG soubor a jeho levou polovinu ulozit do jineho souboru spolu s nestandartnimi metadaty. Zroven tato metadata umi i cist.')
+parser.add_argument('-a', '--akce', choices=['crop', 'getmeta'], help='Akce crop nacte soubor, a jeho polovinu ulozi s polu s metadaty do vystupniho souboru "out_<vstupni soubor.jpg>". Akce getmeta zobrazi metadata ulozena akci crop.', required=True)
+parser.add_argument('soubor', help='nazev souboru s JPEG obrazkem')
+args = parser.parse_args()
 
 
-if sys.argv[1] == 'crop':        
-    img = Image.open(sys.argv[2])
+if args.akce == 'crop':        
+    img = Image.open(args.soubor)
     imgCropped = img.crop((0,0,img.width//2, img.height))
     f = io.BytesIO()
     imgCropped.save(f, 'jpeg')
     f.seek(0)
 
-    fo2 = open('out2.jpg', 'wb')
-    fo2.write(f.getvalue())
-    fo2.close()
+    js = jpgparser.JpegStructure.fromStream(f)
 
-    fo = open('out.jpg', 'wb')
-    #f = open(sys.argv[1], 'rb')
+    zprava = input('Zadejte tajnou zpravu: ').encode('ascii')
+    js.addMarker(jpgparser.Marker(b'\xff\xef', None, zprava))
+    js.writeToFile('out_'+args.soubor)
+          
 
-    if (f.read(2) != b'\xff\xd8'):
-        print('Chyba: nejedna se o JPEG soubor')
-        
-    fo.write(b'\xff\xd8')    
-
-    while True: #jednotlive markery
-        bts = f.read(2)
-        if (bts == b''):
-            print('Chyba: predcasny EOF')
-            exit()
-        print('Marker ' + binascii.hexlify(bts).decode('ascii') + ' @ ' + str(f.tell())+' = '+hex(f.tell()))
-        if (bts[0] != 0xff):
-            print('Chyba: Zacatek markeru se nerovna FF, ale ' + hex(bts[0]))
-            exit()
-        if (bts == b'\xff\xd9'):
-            print('Chyba: Predcasny marker EOI: FF D9')
-            exit()
-        if (bts == b'\xff\xda'):
-            print('ffda = SOS')
-            break
-        fo.write(bts)#
-        bdelka = f.read(2)
-        fo.write(bdelka)#
-        delka = 256 * bdelka[0] + bdelka[1] - 2
-        if (delka <= 0):
-            print('Chyba: zaporna delka '+delka+' = '+binascii.hexlify(bdelka).decode('ascii'))
-            exit()
-        blok = f.read(delka)
-        fo.write(blok)#
-        
-    zprava = b'Lorem Ipsum'
-    delka = len(zprava)+2
-    bdelka1 = bytes([delka])
-    bdelka = (2-len(bdelka1)) * b'\x00' + bdelka1
-    fo.write(b'\xff\xef')
-    fo.write(bdelka)
-    fo.write(zprava)
-    fo.write(b'\xff\xda')#
-      
-    while True:
-        byte = f.read(1)
-        fo.write(byte)
-        if (byte == b''):
-            print('Chyba: predcasny EOF')
-            exit()
-        if (byte == b'\xff'):
-            tmp = f.read(1)
-            fo.write(tmp)
-            if (tmp == b'\xd9'):
-                print('ffd9 = EOI @ ' + str(f.tell())+' = '+hex(f.tell()))
-                break
-
-    if (f.read() != b''):
-        print('Chyba: po EOI by nemelo nic nasledovat')
-        
-    print('OK: Parse probehl bez chyby')    
-    fo.close()
-
-
-if sys.argv[1] == 'getmeta':
-    f = open(sys.argv[2], 'rb')
-    if (f.read(2) != b'\xff\xd8'):
-        print('Chyba: nejedna se o JPEG soubor')
-    while True: #jednotlive markery
-        bts = f.read(2)
-        if (bts == b''):
-            print('Chyba: predcasny EOF')
-            exit()
-        print('Marker ' + binascii.hexlify(bts).decode('ascii') + ' @ ' + str(f.tell())+' = '+hex(f.tell()))
-        if (bts[0] != 0xff):
-            print('Chyba: Zacatek markeru se nerovna FF, ale ' + hex(bts[0]))
-            exit()
-        if (bts == b'\xff\xd9'):
-            print('Chyba: Predcasny marker EOI: FF D9')
-            exit()    
-        if (bts == b'\xff\xda'):
-            print('ffda = SOS')
-            break
-        bdelka = f.read(2)
-        delka = 256 * bdelka[0] + bdelka[1] - 2
-        if (delka <= 0):
-            print('Chyba: zaporna delka '+str(delka)+' = '+binascii.hexlify(bdelka).decode('ascii'))
-            exit()
-        blok = f.read(delka)
-        if (bts == b'\xff\xef'):
-            print('Meta je ('+str(delka)+'): '+blok.decode('ascii'))
-            exit()
+if args.akce == 'getmeta':
+    js = jpgparser.JpegStructure.fromFile(args.soubor)
+    markers = js.getMarkers(b'\xff\xef')
+    if (len(markers) <= 0):
+        print('Soubor neobsahuje hledana metadata')
+    else:
+        for marker in markers:
+            print('Tajna zprava = "' + marker.data.decode('ascii') + '"')
     
         
