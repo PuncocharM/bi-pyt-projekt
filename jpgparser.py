@@ -18,7 +18,10 @@ class Marker:
         self.head = head
         if length == None:
             delka = len(data)+2
-            bdelka1 = bytes([delka])
+            if (delka//256 > 255):
+                print('Chyba: data markeru jsou prilis velka')
+                return None
+            bdelka1 = bytes([delka//256, delka%256])
             bdelka = (2-len(bdelka1)) * b'\x00' + bdelka1
             self.length = bdelka
         else:
@@ -63,7 +66,7 @@ class JpegStructure:
                 f.write(b'\xff\xd9')
             print('Zapsano do souboru '+filename)
         except:
-            print('Chyba: Nepodarilo se zapsat soubor')
+            print('Chyba: Nepodarilo se zapsat soubor '+filename+'.')
 
     # @staticmethod
     # def fromBytes(bts):
@@ -77,7 +80,7 @@ class JpegStructure:
             with open(fileName, 'rb') as f:
                 return JpegStructure.fromStream(f)
         except:
-            print('Chyba: Nepodarilo se nacist soubor')
+            print('Chyba: Nepodarilo se nacist soubor '+fileName+'.')
             return None
     
     @staticmethod
