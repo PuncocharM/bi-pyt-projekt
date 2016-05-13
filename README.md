@@ -3,7 +3,7 @@
 Potřebné externí balíčky: Pillow ("pip install Pillow")
 
 ---
-
+```
 usage: main.py [-h] [-c meta_text meta_soubor soubor_out] [-g soubor_out] soubor_in
 
 Stereoskopicke obrazky: skript umi nacist JPEG soubor a jeho levou polovinu
@@ -21,3 +21,4 @@ optional arguments:
   -g soubor_out, --get soubor_out
                         Ze souboru soubor_in ziska ulozenou zpravu a ulozeny
                         soubor zapise do soubor_out
+```
